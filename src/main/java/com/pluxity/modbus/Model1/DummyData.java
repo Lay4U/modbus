@@ -8,6 +8,8 @@ import com.ghgande.j2mod.modbus.net.TCPMasterConnection;
 import com.ghgande.j2mod.modbus.procimg.Register;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.math3.distribution.NormalDistribution;
+import org.springframework.context.annotation.Bean;
+import org.springframework.stereotype.Component;
 
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
@@ -23,7 +25,7 @@ import java.util.Date;
 import java.util.Objects;
 import java.util.UUID;
 
-
+@Component
 @Slf4j
 public class DummyData {
     public static final int LIMIT_RETRY = 3;
@@ -57,20 +59,20 @@ public class DummyData {
     }
 
     public void sendDataToServer() throws Exception {
-        InetAddress serverIpAddress = InetAddress.getByName("127.0.0.1");
+//        InetAddress serverIpAddress = InetAddress.getByName("127.0.0.1");
+        InetAddress serverIpAddress = InetAddress.getLocalHost();
         int retryCount = 0;
         while (retryCount < LIMIT_RETRY) {
-            byte[] modbusPacket = createModbusPacket(serverIpAddress);
-            byte[] encryptedPacket = encrpyt(modbusPacket);
+            final byte[] modbusPacket = createModbusPacket(serverIpAddress);
+            final byte[] encryptedPacket = encrpyt(modbusPacket);
 
-            //실제로 서버에 보내야 하는데 여기서는 테스트를 위해 로컬로 보냄
             try (Socket socket = new Socket(serverIpAddress, 8080)) {
                 OutputStream outputStream = socket.getOutputStream();
                 outputStream.write(Objects.requireNonNull(encryptedPacket));
                 break;
             } catch (IOException e) {
                 retryCount++;
-                log.error("Error while sending data to server. Retry count: " + retryCount);
+                e.printStackTrace();
                 if (retryCount == LIMIT_RETRY) {
                     throw e;
                 }
@@ -99,7 +101,7 @@ public class DummyData {
         return cipher.doFinal(modbusPacket);
     }
 
-    private byte[] createModbusPacket(InetAddress serverIpAddress) {
+    public byte[] createModbusPacket(final InetAddress serverIpAddress) {
         // modbus connection Setting
         TCPMasterConnection connection = null;
         try {
@@ -108,13 +110,10 @@ public class DummyData {
             connection.connect();
         } catch (Exception e) {
             e.printStackTrace();
-            log.error("Error while creating connection", e);
             return null;
         }
 
-        // modbus request 준비
         ReadMultipleRegistersRequest request = new ReadMultipleRegistersRequest(0, 8);
-        // modbus transaction 준비
         ModbusTCPTransaction transaction = new ModbusTCPTransaction(connection);
         transaction.setRequest(request);
 
@@ -123,7 +122,6 @@ public class DummyData {
             transaction.execute();
         } catch (ModbusException e) {
             e.printStackTrace();
-            log.error("Error while executing transaction", e);
             return null;
         }
 
